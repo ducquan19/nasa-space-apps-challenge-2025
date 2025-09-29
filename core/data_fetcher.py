@@ -41,7 +41,7 @@ async def get_raw_data_async(target_dt, lat, lon, params, window=5, years_back=1
         df = pd.DataFrame({p: pd.Series(r[p]) for p in params})
         # parse index like '2025092712' (YYYYmmddHH)
         df.index = pd.to_datetime(df.index, format="%Y%m%d%H", errors="coerce")
-        df = df.dropna(how="all")
+        # df = df.dropna(how="all")
         df["year"] = past_year
         df["hour"] = df.index.hour
         dfs.append(df)

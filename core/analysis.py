@@ -1,48 +1,48 @@
 # core/analysis.py
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import io, base64
 
 
-def compute_daily_summary(hourly_df):
+def compute_ci_multitarget(raw_df, params, target_dt, ci_levels=[0.3, 0.6, 0.9]):
     """
-    hourly_df: DataFrame with 'datetime' and variables.
-    Returns dict daily averages; for PRECTOTCORR returns total.
+    Tạo dataframe dự đoán + các khoảng tin cậy từ dữ liệu quá khứ.
+    raw_df: historical data (many years back)
+    params: variables list
+    target_dt: target datetime
+    ci_levels: list like [0.3,0.6,0.9]
     """
-    if hourly_df.empty:
-        return {}
-    df = hourly_df.copy()
-    # ensure datetime
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    # numeric cols excluding CI cols
-    base_vars = [
-        c
-        for c in df.columns
-        if not c.endswith(
-            ("_low_30", "_high_30", "_low_60", "_high_60", "_low_90", "_high_90")
-        )
-        and c != "datetime"
+    hours = range(24)
+    pred_dt_index = [
+        target_dt.replace(hour=h, minute=0, second=0, microsecond=0) for h in hours
     ]
-    # For PRECTOTCORR we compute total (sum) because precip more meaningful as sum
-    summary = {}
-    for v in base_vars:
-        if v == "PRECTOTCORR":
-            summary["PRECTOTCORR_total"] = float(df[v].sum())
-            summary[v + "_mean"] = float(df[v].mean())
-        else:
-            summary[v + "_mean"] = float(df[v].mean())
-    return summary
+    ci_dict = {"datetime": pred_dt_index}
+
+    for p in params:
+        for h in hours:
+            values = raw_df[raw_df["hour"] == h][p].dropna()
+            if len(values) == 0:
+                values = pd.Series([0])
+            for ci in ci_levels:
+                lower = np.percentile(values, 50 - ci * 50)
+                upper = np.percentile(values, 50 + ci * 50)
+                ci_dict.setdefault(f"{p}_low_{int(ci*100)}", []).append(lower)
+                ci_dict.setdefault(f"{p}_high_{int(ci*100)}", []).append(upper)
+        mean_vals = [raw_df[raw_df["hour"] == h][p].mean() for h in hours]
+        ci_dict[p] = mean_vals
+
+    return pd.DataFrame(ci_dict)
 
 
-def plot_fanmap_base64(hourly_df, param, ci_levels=[30, 60, 90]):
+def plot_fanmap_base64(ci_df, param, ci_levels=[30, 60, 90]):
     """
-    hourly_df: DataFrame containing columns param and param_low_X, param_high_X.
-    Returns base64 PNG string.
+    Vẽ fanmap từ ci_df (compute_ci_multitarget).
     """
-    if hourly_df.empty or param not in hourly_df.columns:
+    if ci_df.empty or param not in ci_df.columns:
         return None
 
-    df = hourly_df.copy()
+    df = ci_df.copy()
     df["datetime"] = pd.to_datetime(df["datetime"])
 
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -73,10 +73,10 @@ def plot_fanmap_base64(hourly_df, param, ci_levels=[30, 60, 90]):
     return b64
 
 
-def summarize_and_fanmaps(hourly_df, params):
-    summary = compute_daily_summary(hourly_df)
+def summarize_and_fanmaps(raw_df, params, target_dt):
+    ci_df = compute_ci_multitarget(raw_df, params, target_dt)
     fanmaps = {}
     for p in params:
-        b64 = plot_fanmap_base64(hourly_df, p)
+        b64 = plot_fanmap_base64(ci_df, p)
         fanmaps[p] = b64
-    return {"daily_summary": summary, "fanmaps": fanmaps}
+    return {"ci_df": ci_df, "fanmaps": fanmaps}

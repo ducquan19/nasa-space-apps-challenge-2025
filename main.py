@@ -60,27 +60,30 @@ def forecast(
             detail="No historical data available for this location/date",
         )
 
-    # 4) fit bootstrap ensemble and produce hourly forecast with CI
-    try:
-        hourly_df = forecast_lightgbm_bootstrap(
-            raw_df, PARAMS, target_dt, n_models=n_models
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Model error: {e}")
+    # 4) fit bootstrap ensemble (giữ nguyên để lấy hourly prediction)
+    hourly_df = forecast_lightgbm_bootstrap(raw_df, PARAMS, target_dt, n_models=n_models)
 
-    # ensure datetime column stringified
-    hourly_df["datetime"] = pd.to_datetime(hourly_df["datetime"])
-    hourly_list = hourly_df.to_dict(orient="records")
+    # 5) tính daily summary từ hourly_df
+    daily_summary = {}
+    if not hourly_df.empty:
+        base_vars = [p for p in PARAMS if p in hourly_df.columns]
+        for v in base_vars:
+            if v == "PRECTOTCORR":
+                daily_summary["PRECTOTCORR_total"] = float(hourly_df[v].sum())
+                daily_summary[v+"_mean"] = float(hourly_df[v].mean())
+            else:
+                daily_summary[v+"_mean"] = float(hourly_df[v].mean())
 
-    # 5) compute daily summary & fanmaps
-    result = summarize_and_fanmaps(hourly_df, ["T2M", "RH2M", "PRECTOTCORR", "WS2M"])
+    # 6) tính CI fanmaps từ raw_df (history)
+    from core.analysis import summarize_and_fanmaps
+    fanmap_result = summarize_and_fanmaps(raw_df, PARAMS, target_dt)
 
     return {
         "place": place,
         "lat": lat,
         "lon": lon,
         "target_date": target_dt.strftime("%Y-%m-%d"),
-        "hourly": hourly_list,
-        "daily_summary": result["daily_summary"],
-        "fanmaps": result["fanmaps"],
+        "hourly": hourly_df.to_dict(orient="records"),
+        "daily_summary": daily_summary,
+        "fanmaps": fanmap_result["fanmaps"],
     }
