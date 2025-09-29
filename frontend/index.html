@@ -1,0 +1,92 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Climate Forecast Demo</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      .container {
+        max-width: 900px;
+      }
+      img {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid #ddd;
+        margin-top: 8px;
+      }
+      .summary {
+        background: #f7f7f7;
+        padding: 10px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Climate Forecast Demo</h2>
+      <label>Place: <input id="place" value="Ho Chi Minh City" /></label>
+      <label style="margin-left: 12px"
+        >Date: <input id="date" type="date" value="2025-10-02"
+      /></label>
+      <button onclick="callForecast()">Get Forecast</button>
+
+      <h3>Daily Summary</h3>
+      <pre id="summary" class="summary">No data</pre>
+
+      <h3>Fanmaps</h3>
+      <div id="fanmaps"></div>
+
+      <h3>Hourly (first 6 rows)</h3>
+      <pre id="hourly">No data</pre>
+    </div>
+
+    <script>
+      async function callForecast() {
+        const place = encodeURIComponent(
+          document.getElementById("place").value
+        );
+        const date = document.getElementById("date").value;
+        const url = `http://127.0.0.1:8000/forecast?place=${place}&date=${date}`;
+        document.getElementById("summary").innerText = "Loading...";
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            const err = await res.json();
+            document.getElementById("summary").innerText =
+              "Error: " + JSON.stringify(err);
+            return;
+          }
+          const data = await res.json();
+          document.getElementById("summary").innerText = JSON.stringify(
+            data.daily_summary,
+            null,
+            2
+          );
+          // fanmaps
+          const fanDiv = document.getElementById("fanmaps");
+          fanDiv.innerHTML = "";
+          for (const k in data.fanmaps) {
+            const imgB64 = data.fanmaps[k];
+            if (imgB64) {
+              const el = document.createElement("div");
+              el.innerHTML = `<h4>${k}</h4><img src="data:image/png;base64,${imgB64}" alt="${k}">`;
+              fanDiv.appendChild(el);
+            }
+          }
+          // hourly show first 6
+          document.getElementById("hourly").innerText = JSON.stringify(
+            data.hourly.slice(0, 6),
+            null,
+            2
+          );
+        } catch (e) {
+          document.getElementById("summary").innerText = "Exception: " + e;
+        }
+      }
+    </script>
+  </body>
+</html>
