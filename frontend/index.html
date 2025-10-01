@@ -1,92 +1,60 @@
-<!-- frontend/index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>Climate Forecast Demo</title>
+    <meta charset="UTF-8" />
+    <title>Weather Forecast Viewer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
       body {
         font-family: Arial, sans-serif;
         margin: 20px;
       }
-      .container {
-        max-width: 900px;
+      h1 {
+        color: #333;
       }
-      img {
-        max-width: 100%;
-        height: auto;
-        border: 1px solid #ddd;
-        margin-top: 8px;
+      .form-group {
+        margin-bottom: 10px;
       }
-      .summary {
-        background: #f7f7f7;
+      label {
+        display: block;
+        font-weight: bold;
+      }
+      input {
+        padding: 5px;
+        width: 250px;
+      }
+      button {
+        padding: 6px 12px;
+      }
+      #summary {
+        margin-top: 20px;
         padding: 10px;
-        border-radius: 6px;
+        border: 1px solid #ddd;
+        background: #f9f9f9;
+      }
+      .chart {
+        margin-top: 30px;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h2>Climate Forecast Demo</h2>
-      <label>Place: <input id="place" value="Ho Chi Minh City" /></label>
-      <label style="margin-left: 12px"
-        >Date: <input id="date" type="date" value="2025-10-02"
-      /></label>
-      <button onclick="callForecast()">Get Forecast</button>
+    <h1>Weather Forecast</h1>
 
-      <h3>Daily Summary</h3>
-      <pre id="summary" class="summary">No data</pre>
-
-      <h3>Fanmaps</h3>
-      <div id="fanmaps"></div>
-
-      <h3>Hourly (first 6 rows)</h3>
-      <pre id="hourly">No data</pre>
+    <div>
+      <div class="form-group">
+        <label for="place">Địa điểm:</label>
+        <input type="text" id="place" value="Ho Chi Minh" />
+      </div>
+      <div class="form-group">
+        <label for="date">Ngày (yyyy-mm-dd):</label>
+        <input type="date" id="date" />
+      </div>
+      <button onclick="getForecast()">Xem dự báo</button>
     </div>
 
-    <script>
-      async function callForecast() {
-        const place = encodeURIComponent(
-          document.getElementById("place").value
-        );
-        const date = document.getElementById("date").value;
-        const url = `http://127.0.0.1:8000/forecast?place=${place}&date=${date}`;
-        document.getElementById("summary").innerText = "Loading...";
-        try {
-          const res = await fetch(url);
-          if (!res.ok) {
-            const err = await res.json();
-            document.getElementById("summary").innerText =
-              "Error: " + JSON.stringify(err);
-            return;
-          }
-          const data = await res.json();
-          document.getElementById("summary").innerText = JSON.stringify(
-            data.daily_summary,
-            null,
-            2
-          );
-          // fanmaps
-          const fanDiv = document.getElementById("fanmaps");
-          fanDiv.innerHTML = "";
-          for (const k in data.fanmaps) {
-            const imgB64 = data.fanmaps[k];
-            if (imgB64) {
-              const el = document.createElement("div");
-              el.innerHTML = `<h4>${k}</h4><img src="data:image/png;base64,${imgB64}" alt="${k}">`;
-              fanDiv.appendChild(el);
-            }
-          }
-          // hourly show first 6
-          document.getElementById("hourly").innerText = JSON.stringify(
-            data.hourly.slice(0, 6),
-            null,
-            2
-          );
-        } catch (e) {
-          document.getElementById("summary").innerText = "Exception: " + e;
-        }
-      }
-    </script>
+    <div id="summary"></div>
+    <div id="charts"></div>
+
+    <script src="script.js"></script>
   </body>
 </html>

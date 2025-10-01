@@ -1,8 +1,48 @@
-# core/model.py
+from typing import List
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
-from sklearn.multioutput import MultiOutputRegressor
 import lightgbm as lgb
+from sklearn.model_selection import train_test_split
+from sklearn.multioutput import MultiOutputRegressor
+from xgboost import XGBRegressor
+
+
+def forecast_lightgbm_multitarget(
+    raw_df: pd.DataFrame, parameters: List[str], target_dt: datetime
+) -> pd.DataFrame:
+    df = raw_df.copy()
+    df["sin_hour"] = np.sin(2 * np.pi * df["hour"] / 24)
+    df["cos_hour"] = np.cos(2 * np.pi * df["hour"] / 24)
+
+    X = df[["hour", "sin_hour", "cos_hour", "year"]]
+    y = df[parameters]
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
+
+    model = MultiOutputRegressor(estimator=XGBRegressor())
+    model.fit(X_train, y_train)
+
+    hours = range(24)
+    X_pred = pd.DataFrame(
+        {
+            "hour": hours,
+            "sin_hour": np.sin(2 * np.pi * np.array(hours) / 24),
+            "cos_hour": np.cos(2 * np.pi * np.array(hours) / 24),
+            "year": target_dt.year,
+        }
+    )
+    y_pred = model.predict(X_pred)
+
+    pred_df = pd.DataFrame(y_pred, columns=parameters)
+    pred_df["datetime"] = [
+        target_dt.replace(hour=h, minute=0, second=0, microsecond=0) for h in hours
+    ]
+
+    return pred_df[["datetime"] + parameters]
 
 
 def forecast_lightgbm_bootstrap(

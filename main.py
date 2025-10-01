@@ -1,67 +1,70 @@
-# main.py
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+import json
 from datetime import datetime
+
+import numpy as np
 import pandas as pd
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from core.geocode import geocode_osm
 from core.data_fetcher import fetch_raw_data
+from core.analysis import compute_ci_multitarget, plot_fanmap_plotly
 from core.model import forecast_lightgbm_bootstrap
-from core.analysis import summarize_and_fanmaps
 
-app = FastAPI(title="Climate Forecast API (NASA + LightGBM)")
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# default variable list (match your raw data)
+# Các tham số khí tượng cần
 PARAMS = ["T2M", "RH2M", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN", "WS2M"]
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+def make_jsonable(obj):
+    """Đệ quy chuyển object (numpy, Timestamp, dict, list) thành Python thuần để JSON encode được"""
+    if isinstance(obj, (np.generic,)):
+        return obj.item()
+    if isinstance(obj, pd.Timestamp):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: make_jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [make_jsonable(v) for v in obj]
+    return obj
 
 
 @app.get("/forecast")
-def forecast(
-    place: str, date: str, window: int = 5, years_back: int = 10, n_models: int = 20
-):
-    """
-    Example: /forecast?place=Ho%20Chi%20Minh%20City&date=2025-10-02
-    Returns JSON: hourly forecast list (24 items), daily_summary, fanmaps (base64)
-    """
-    # 1) geocode
-    lat, lon = geocode_osm(place)
-    if lat is None:
-        raise HTTPException(status_code=404, detail="Place not found")
+def forecast(place: str = Query(...), date: str = Query(...)):
+    # 1. Geocode -> lat, lon
+    coords = geocode_osm(place)
+    if not coords:
+        return {"error": f"Không tìm thấy địa điểm '{place}'"}
+    lat, lon = coords
 
-    # 2) parse date
+    # 2. Parse date
     try:
-        target_dt = datetime.strptime(date, "%Y-%m-%d")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+        target_dt = datetime.fromisoformat(date)
+    except Exception:
+        return {"error": f"Ngày không hợp lệ: {date}"}
 
-    # 3) fetch raw historical data from NASA POWER (async wrapper)
-    try:
-        raw_df = fetch_raw_data(
-            target_dt, lat, lon, PARAMS, window=window, years_back=years_back
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Error fetching NASA POWER: {e}")
-
+    # 3. Lấy dữ liệu NASA POWER
+    raw_df = fetch_raw_data(target_dt, lat, lon, PARAMS)
     if raw_df.empty:
-        raise HTTPException(
-            status_code=502,
-            detail="No historical data available for this location/date",
-        )
+        return {"error": "Không có dữ liệu từ NASA POWER"}
 
-    # 4) fit bootstrap ensemble (giữ nguyên để lấy hourly prediction)
-    hourly_df = forecast_lightgbm_bootstrap(raw_df, PARAMS, target_dt, n_models=n_models)
+    # 4. Tính CI theo giờ
+    ci_df = compute_ci_multitarget(raw_df, PARAMS, target_dt)
+
+    # 5. Tính daily summary
+    n_models = 20
+    hourly_df = forecast_lightgbm_bootstrap(
+        raw_df, PARAMS, target_dt, n_models=n_models
+    )
 
     # 5) tính daily summary từ hourly_df
     daily_summary = {}
@@ -70,20 +73,24 @@ def forecast(
         for v in base_vars:
             if v == "PRECTOTCORR":
                 daily_summary["PRECTOTCORR_total"] = float(hourly_df[v].sum())
-                daily_summary[v+"_mean"] = float(hourly_df[v].mean())
+                daily_summary[v + "_mean"] = float(hourly_df[v].mean())
             else:
-                daily_summary[v+"_mean"] = float(hourly_df[v].mean())
+                daily_summary[v + "_mean"] = float(hourly_df[v].mean())
 
-    # 6) tính CI fanmaps từ raw_df (history)
-    from core.analysis import summarize_and_fanmaps
-    fanmap_result = summarize_and_fanmaps(raw_df, PARAMS, target_dt)
+    # 6. Vẽ biểu đồ cho tất cả param
+    html_charts = {}
+    figures = {}
+    for p in PARAMS:
+        html_str, fig_dict = plot_fanmap_plotly(ci_df, p)
+        html_charts[p] = html_str
+        figures[p] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
         "place": place,
-        "lat": lat,
-        "lon": lon,
-        "target_date": target_dt.strftime("%Y-%m-%d"),
-        "hourly": hourly_df.to_dict(orient="records"),
-        "daily_summary": daily_summary,
-        "fanmaps": fanmap_result["fanmaps"],
+        "coords": {"lat": lat, "lon": lon},
+        "date": target_dt.isoformat(),
+        # "daily_summary": make_jsonable(daily_summary),
+        # "hourly": make_jsonable(ci_df.to_dict(orient="records")),
+        "html_charts": html_charts,
+        "figures": figures,  # lúc này mỗi cái là JSON string
     }
