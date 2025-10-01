@@ -1,4 +1,3 @@
-# core/geocode.py
 import requests
 
 
