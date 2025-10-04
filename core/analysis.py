@@ -1,3 +1,4 @@
+import json
 from typing import List, Dict
 from datetime import datetime
 
@@ -8,7 +9,9 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import lightgbm as lgb
 
-from core.thresholds import PARAM_THRESHOLDS
+
+with open("core/thresholds.json", "r", encoding="utf-8") as f:
+    PARAMETER = json.load(f)
 
 
 def compute_ci_multitarget(
@@ -207,7 +210,7 @@ def plotly_monthly_overview(pred_df: pd.DataFrame, parameter: str):
     )
 
     fig = go.Figure(data=traces)
-    thresholds = PARAM_THRESHOLDS[parameter]
+    thresholds = PARAMETER[parameter]["thresholds"]
 
     # Gom các đoạn liên tiếp cùng loại gió
     segments = []
@@ -264,7 +267,7 @@ def plotly_monthly_overview(pred_df: pd.DataFrame, parameter: str):
             mode="markers",
             marker=dict(color="red", size=10, symbol="circle"),
             name="Max",
-            hovertemplate=f"Time: %{{x}}<br>{parameter}: %{{y:.2f}}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
         )
     )
 
@@ -275,15 +278,15 @@ def plotly_monthly_overview(pred_df: pd.DataFrame, parameter: str):
             mode="markers",
             marker=dict(color="blue", size=10, symbol="circle"),
             name="Min",
-            hovertemplate=f"Time: %{{x}}<br>{parameter}: %{{y:.2f}}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
         )
     )
 
     # Layout
     fig.update_layout(
-        title=f"Fan Map for {parameter} on {datetime.now().year}",
+        title=f"{PARAMETER[parameter]['name']} on {datetime.now().year}",
         xaxis_title="Time",
-        yaxis_title=parameter,
+        yaxis_title=f"{PARAMETER[parameter]['name']} ({PARAMETER[parameter]['unit']})",
         template="simple_white",
     )
 
