@@ -78,7 +78,7 @@ def forecast_point_one_day(place: str = Query(...), date: str = Query(...)):
 
 
 @app.get("/monthly_weather")
-def forecast_monthly(place: str = Query(...)):
+async def forecast_monthly(place: str = Query(...)):
     latitude, longitude = geocode_osm(place)
 
     target_date = datetime.now()
@@ -103,7 +103,7 @@ def forecast_monthly(place: str = Query(...)):
 
 
 @app.get("/forecast_point_many_days")
-def forecast_point_many_days(
+async def forecast_point_many_days(
     place: str = Query(...), start_date: str = Query(...), end_date: str = Query(...)
 ):
     latitude, longitude = geocode_osm(place)
@@ -113,15 +113,15 @@ def forecast_point_many_days(
     ci_list = []
 
     while start_date <= end_date:
-        target_dt = start_date
-        raw_df = await get_raw_data_async(target_dt, latitude, longitude, PARAMETERS)
-        raw_df = normalize_raw_df(raw_df)  # thêm year/month/day/hour - quan trọng
+        target_date = start_date
+        raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
+        raw_df = normalize_raw_df(raw_df)
         start_date += timedelta(1)
         # 2) dự đoán bằng LightGBM quantile
         pred_df, models = forecast_lightgbm_multitarget(
             raw_df,
             PARAMETERS,
-            target_dt,
+            target_date,
             quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
             num_boost_round=300,
         )
@@ -140,7 +140,7 @@ def forecast_point_many_days(
     return {
         "place": place,
         "coords": {"latitude": latitude, "longitude": longitude},
-        "date": target_dt.isoformat(),
+        "date": target_date.isoformat(),
         "figures": figures,  # lúc này mỗi cái là JSON string
     }
 

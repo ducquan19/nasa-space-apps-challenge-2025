@@ -9,27 +9,27 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"
+    />
     <!-- Vẽ bản đồ -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script
+      src="https://cdn.plot.ly/plotly-latest.min.js"
+      charset="utf-8"
+    ></script>
     <!-- Vẽ biểu đồ -->
-    <!-- Leaflet + GeoRaster libs for map -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/geotiff/dist/geotiff.browser.min.js"></script>
-    <script src="https://unpkg.com/georaster/dist/georaster.browserify.min.js"></script>
-    <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
-
-    <script type="module" src="./script.js"></script>
-    <script type="module" src="./map.js"></script>
-    <script type="module" src="options.js"></script>
   </head>
   <body>
     <header class="topbar" role="banner">
       <!-- Left: brand -->
       <div class="brand">
-        <div class="logo">WR</div>
+        <div class="logo"></div>
         <div>
-          <h1>Weather Risk Assessment</h1>
-          <p>Rainbow Cloud</p>
+          <h1>Rainbow Cloud</h1>
+          <p style="width: 20vw">
+            A smart website for improving our understanding of weather
+          </p>
         </div>
       </div>
 
@@ -159,7 +159,7 @@
     <!-- Main dashboard container -->
     <main id="main">
       <!-- Left: dashboard -->
-      <div id="info">
+      <div id="info" class="sunny">
         <div
           style="
             display: flex;
@@ -177,7 +177,20 @@
             <div class="modal-content">
               <span class="close">&times;</span>
               <h2 id="climate_title"></h2>
-              <p id="climate_description"></p>
+              <div class="modal-body">
+                <!-- Văn bản -->
+                <div class="modal-text">
+                  <div id="climate_description"></div>
+                </div>
+
+                <!-- Hình ảnh -->
+                <div class="modal-image">
+                  <img id="img1" src="" alt="Ảnh 1" />
+                  <img id="img2" src="" alt="Ảnh 2" />
+                  <img id="img3" src="" alt="Ảnh 3" />
+                  <img id="img4" src="" alt="Ảnh 4" />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -394,5 +407,16 @@
         ></iframe> -->
       </div>
     </main>
+
+    <!-- Leaflet + GeoRaster libs for map -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/geotiff/dist/geotiff.browser.min.js"></script>
+    <script src="https://unpkg.com/georaster/dist/georaster.browserify.min.js"></script>
+    <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+
+    <script type="module" src="script.js"></script>
+    <script type="module" src="map.js"></script>
+    <script type="module" src="options.js"></script>
   </body>
 </html>

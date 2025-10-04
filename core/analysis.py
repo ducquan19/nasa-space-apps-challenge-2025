@@ -46,7 +46,7 @@ def compute_ci_multitarget(
 
 def classify_threshold(val: float, thresholds: List[Dict]):
     for threshold in thresholds:
-        if threshold["lower"] <= val <= threshold["upper"]:
+        if float(threshold["lower"]) <= val <= float(threshold["upper"]):
             return threshold
 
     return None
@@ -73,7 +73,7 @@ def plotly_fanmap_one_day(
                 fillcolor=f"rgba({int(colors[idx][0] * 255)}, {int(colors[idx][1] * 255)}, {int(colors[idx][2] * 255)}, 0.3)",
                 line=dict(color="rgba(255,255,255,0)"),
                 hoverinfo="skip",
-                name=f"{ci}% CI",
+                name=f"{ci}%",
             )
         )
 
@@ -86,12 +86,12 @@ def plotly_fanmap_one_day(
             mode="lines+markers",
             line=dict(color="black", width=2),
             name="Mean",
-            hovertemplate=f"Time: %{{x}}<br>{parameter}: %{{y:.2f}}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
         )
     )
 
     fig = go.Figure(data=traces)
-    thresholds = PARAM_THRESHOLDS[parameter]
+    thresholds = PARAMETER[parameter]["thresholds"]
 
     # Gom các đoạn liên tiếp cùng loại gió
     segments = []
@@ -148,7 +148,7 @@ def plotly_fanmap_one_day(
             mode="markers",
             marker=dict(color="red", size=10, symbol="circle"),
             name="Max",
-            hovertemplate=f"Time: %{{x}}<br>{parameter}: %{{y:.2f}}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
         )
     )
 
@@ -159,20 +159,19 @@ def plotly_fanmap_one_day(
             mode="markers",
             marker=dict(color="blue", size=10, symbol="circle"),
             name="Min",
-            hovertemplate=f"Time: %{{x}}<br>{parameter}: %{{y:.2f}}<extra></extra>",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
         )
     )
 
     # Layout
     fig.update_layout(
-        title=f"Fan Map for {parameter} on {x[0].split()[0]}",
-        xaxis_title="Hour",
-        yaxis_title=parameter,
+        title=f"{PARAMETER[parameter]['name']} on {x[0].split()[0]}",
+        xaxis_title="Time",
+        yaxis_title=f"{PARAMETER[parameter]['name']} ({PARAMETER[parameter]['unit']})",
         template="simple_white",
     )
 
     # Hiển thị lưới
-    fig.update_xaxes(showgrid=False)
     fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor="lightgray")
 
     return fig
