@@ -153,3 +153,24 @@ async def get_monthly_data_async(
 
     full_df = pd.concat(dfs, axis=0)
     return full_df.reset_index(drop=True)
+
+
+def fetch_monthly_data(
+    target_date: datetime,
+    latitude: float,
+    longitude: float,
+    parameters: List[str],
+    window: int = 5,
+    years_back: int = 10,
+) -> pd.DataFrame:
+
+    return asyncio.run(
+        get_monthly_data_async(
+            target_date,
+            latitude,
+            longitude,
+            parameters,
+            window=window,
+            years_back=years_back,
+        )
+    )

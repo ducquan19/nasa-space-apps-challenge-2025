@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
 from core.geocode import geocode_osm, get_current_place
-from core.data_fetcher import fetch_hourly_data, get_monthly_data_async
+from core.data_fetcher import fetch_hourly_data, fetch_monthly_data
 from core.analysis import (
     compute_ci_multitarget,
     plotly_one_day,
@@ -59,7 +59,7 @@ def forecast_point_one_day(place: str = Query(...), date: str = Query(...)):
         PARAMETERS,
         target_date,
         quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-        num_boost_round=10,
+        num_boost_round=20,
     )
 
     # 3) compute CI dataframe
@@ -84,7 +84,7 @@ async def forecast_monthly(place: str = Query(...)):
     latitude, longitude = geocode_osm(place)
 
     target_date = datetime.now()
-    raw_df = await get_monthly_data_async(
+    raw_df = fetch_monthly_data(
         target_date, latitude, longitude, ["PRECTOTCORR", "T2M"]
     )
     avg_df = create_monthly_avg_df(raw_df, ["PRECTOTCORR", "T2M"])
@@ -118,15 +118,15 @@ def forecast_point_many_days(
     while target_date <= end_date:
         raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
         raw_df = normalize_raw_df(raw_df)
-        target_date += timedelta(1)
         # 2) dự đoán bằng LightGBM quantile
         pred_df, models = forecast_lightgbm_multitarget(
             raw_df,
             PARAMETERS,
             target_date,
             quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-            num_boost_round=10,
+            num_boost_round=20,
         )
+        target_date += timedelta(1)
         ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS)
         ci_list.append(ci_df)
 
@@ -175,7 +175,7 @@ def forecast_region_one_day(coords: List[List[float]], target_date: str = Query(
         PARAMETERS,
         target_date,
         quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-        num_boost_round=10,
+        num_boost_round=20,
     )
 
     # 3) compute CI dataframe
@@ -224,7 +224,7 @@ def forecast_region_many_days(
             PARAMETERS,
             target_date,
             quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-            num_boost_round=10,
+            num_boost_round=20,
         )
         ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS)
         ci_list.append(ci_df)
