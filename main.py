@@ -3,15 +3,25 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 
-from core.geocode import geocode_osm
-from core.data_fetcher import fetch_raw_data
-from core.analysis import compute_ci_multitarget, plot_fanmap_plotly
-from core.model import forecast_lightgbm_bootstrap
+from core.geocode import geocode_osm, get_current_place
+from core.data_fetcher import fetch_hourly_data
+from core.analysis import (
+    compute_ci_multitarget,
+    plot_fanmap_plotly,
+    compute_ci_from_pred_df,
+    normalize_raw_df,
+    forecast_lightgbm_multitarget,
+)
+
 
 app = FastAPI()
+templates = Jinja2Templates(directory="frontend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,76 +31,96 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Các tham số khí tượng cần
-PARAMS = ["T2M", "RH2M", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN", "WS2M"]
+PARAMETERS = ["T2M", "RH2M", "PRECTOTCORR", "ALLSKY_SFC_SW_DWN", "WS2M"]
 
 
-def make_jsonable(obj):
-    """Đệ quy chuyển object (numpy, Timestamp, dict, list) thành Python thuần để JSON encode được"""
-    if isinstance(obj, (np.generic,)):
-        return obj.item()
-    if isinstance(obj, pd.Timestamp):
-        return obj.isoformat()
-    if isinstance(obj, dict):
-        return {k: make_jsonable(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [make_jsonable(v) for v in obj]
-    return obj
-
-
-@app.get("/forecast")
-def forecast(place: str = Query(...), date: str = Query(...)):
-    # 1. Geocode -> lat, lon
-    coords = geocode_osm(place)
-    if not coords:
-        return {"error": f"Không tìm thấy địa điểm '{place}'"}
-    lat, lon = coords
+@app.get("/forecast_point_one_day")
+def forecast_point_one_day(place: str = Query(...), date: str = Query(...)):
+    latitude, longitude = geocode_osm(place)
 
     # 2. Parse date
     try:
-        target_dt = datetime.fromisoformat(date)
+        target_date = datetime.fromisoformat(date)
     except Exception:
-        return {"error": f"Ngày không hợp lệ: {date}"}
+        raise RuntimeError(f"Ngày không hợp lệ: {date}")
 
     # 3. Lấy dữ liệu NASA POWER
-    raw_df = fetch_raw_data(target_dt, lat, lon, PARAMS)
+    raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
+    raw_df = normalize_raw_df(raw_df)
     if raw_df.empty:
-        return {"error": "Không có dữ liệu từ NASA POWER"}
+        raise RuntimeError("Không có dữ liệu từ NASA POWER")
 
-    # 4. Tính CI theo giờ
-    ci_df = compute_ci_multitarget(raw_df, PARAMS, target_dt)
-
-    # 5. Tính daily summary
-    n_models = 20
-    hourly_df = forecast_lightgbm_bootstrap(
-        raw_df, PARAMS, target_dt, n_models=n_models
+    pred_df, models = forecast_lightgbm_multitarget(
+        raw_df,
+        PARAMETERS,
+        target_date,
+        quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
+        num_boost_round=300,
     )
 
-    # 5) tính daily summary từ hourly_df
-    daily_summary = {}
-    if not hourly_df.empty:
-        base_vars = [p for p in PARAMS if p in hourly_df.columns]
-        for v in base_vars:
-            if v == "PRECTOTCORR":
-                daily_summary["PRECTOTCORR_total"] = float(hourly_df[v].sum())
-                daily_summary[v + "_mean"] = float(hourly_df[v].mean())
-            else:
-                daily_summary[v + "_mean"] = float(hourly_df[v].mean())
+    # 3) compute CI dataframe
+    ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS, ci_levels=[0.3, 0.6, 0.9])
 
     # 6. Vẽ biểu đồ cho tất cả param
-    html_charts = {}
     figures = {}
-    for p in PARAMS:
-        html_str, fig_dict = plot_fanmap_plotly(ci_df, p)
-        html_charts[p] = html_str
-        figures[p] = json.dumps(fig_dict, default=str)  # ép thành JSON string
+    for parameter in PARAMETERS:
+        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
         "place": place,
-        "coords": {"lat": lat, "lon": lon},
-        "date": target_dt.isoformat(),
-        # "daily_summary": make_jsonable(daily_summary),
-        # "hourly": make_jsonable(ci_df.to_dict(orient="records")),
-        "html_charts": html_charts,
+        "coords": {"latitude": latitude, "longitude": longitude},
+        "date": target_date.isoformat(),
         "figures": figures,  # lúc này mỗi cái là JSON string
     }
+
+
+@app.get("/monthly_weather")
+def forecast_monthly(place: str = Query(...)):
+    latitude, longitude = geocode_osm(place)
+
+    target_date = datetime.now()
+    # # 2. Parse date
+    # try:
+    #     target_date = datetime.fromisoformat(date)
+    # except Exception:
+    #     raise RuntimeError(f"Ngày không hợp lệ: {date}")
+
+    # 3. Lấy dữ liệu NASA POWER
+    raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
+    raw_df = normalize_raw_df(raw_df)
+    if raw_df.empty:
+        raise RuntimeError("Không có dữ liệu từ NASA POWER")
+
+    pred_df, models = forecast_lightgbm_multitarget(
+        raw_df,
+        PARAMETERS,
+        target_date,
+        quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
+        num_boost_round=300,
+    )
+
+    # 3) compute CI dataframe
+    ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS, ci_levels=[0.3, 0.6, 0.9])
+
+    # 6. Vẽ biểu đồ cho tất cả param
+    figures = {}
+    for parameter in PARAMETERS:
+        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
+
+    return {
+        "place": place,
+        "coords": {"latitude": latitude, "longitude": longitude},
+        "date": target_date.isoformat(),
+        "figures": figures,  # lúc này mỗi cái là JSON string
+    }
+
+
+@app.get("/", response_class=HTMLResponse)
+def current_place(request: Request):
+    data = get_current_place()
+    # data = {"current_place": "Hanoi"}
+    return templates.TemplateResponse(
+        "homepage.html", {"request": request, "data": data}
+    )

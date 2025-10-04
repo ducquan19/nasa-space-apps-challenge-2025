@@ -1,66 +1,149 @@
 PARAM_THRESHOLDS = {
-    "WS2M": [  # gió (m/s)
+    "WS2M": [
+        {
+            "label": "Calm",
+            "lower": 0.0,
+            "upper": 1.0,
+            "color": "rgb(98, 113, 183)"
+        },
         {
             "label": "Light breeze",
-            "y0": 0.0,
-            "y1": 5.4,
-            "color": "rgba(173,216,230,0.3)",
+            "lower": 1.0,
+            "upper": 5.6,
+            "color": "rgb(57,97,159)",
         },
         {
             "label": "Moderate breeze",
-            "y0": 5.5,
-            "y1": 10.7,
-            "color": "rgba(144,238,144,0.3)",
+            "lower": 5.6,
+            "upper": 11.3,
+            "color": "rgb(77,141,123)",
         },
         {
             "label": "Strong breeze",
-            "y0": 10.8,
-            "y1": 17.1,
-            "color": "rgba(255,165,0,0.3)",
+            "lower": 11.3,
+            "upper": 17.5,
+            "color": "rgb(159,127,58)",
         },
-        {"label": "Gale", "y0": 17.2, "y1": 1000000000, "color": "rgba(255,0,0,0.3)"},
+        {
+            "label": "Gale",
+            "lower": 17.5,
+            "upper": 24.7,
+            "color": "rgb(175,80,136)"},
+        {
+            "label": "Storm",
+            "lower": 24.7,
+            "upper": float("inf"),
+            "color": "rgb(68,105,141)",
+        },
     ],
-    "T2M": [  # nhiệt độ (°C)
-        {"label": "Very Cold", "y0": -50, "y1": 0, "color": "rgba(135,206,250,0.3)"},
-        {"label": "Cold", "y0": 0, "y1": 15, "color": "rgba(135,206,250,0.3)"},
-        {"label": "Cool", "y0": 15, "y1": 25, "color": "rgba(144,238,144,0.3)"},
-        {"label": "Hot", "y0": 25, "y1": 35, "color": "rgba(255,165,0,0.3)"},
+    "T2M": [
+        {
+            "label": "Very cold",
+            "lower": -float("inf"),
+            "upper": 0,
+            "color": "rgb(93,133,198)",
+        },
+        {
+            "label": "Cold",
+            "lower": 0,
+            "upper": 15,
+            "color": "rgb(128,147,24)"
+        },
+        {
+            "label": "Cool",
+            "lower": 15,
+            "upper": 28,
+            "color": "rgb(243,183,4)"
+        },
+        {
+            "label": "Hot",
+            "lower": 28,
+            "upper": 35,
+            "color": "rgb(232,83,25)"
+        },
         {
             "label": "Very hot",
-            "y0": 35,
-            "y1": 1000000000,
-            "color": "rgba(255,69,0,0.3)",
+            "lower": 35,
+            "upper": float("inf"),
+            "color": "rgb(71,14,0)",
         },
     ],
-    "RH2M": [  # độ ẩm (%)
-        {"label": "Low", "y0": 0, "y1": 50, "color": "rgba(255,228,181,0.3)"},
-        {"label": "High", "y0": 50, "y1": 80, "color": "rgba(173,216,230,0.3)"},
+    "RH2M": [
+        {
+            "label": "Very low",
+            "lower": 0,
+            "upper": 25,
+            "color": "rgb(173,110,56)"
+        },
+        {
+            "label": "Low",
+            "lower": 25,
+            "upper": 50,
+            "color": "rgb(105,173,56)"
+        },
+        {
+            "label": "High",
+            "lower": 50,
+            "upper": 80,
+            "color": "rgb(56,160,173)"
+        },
         {
             "label": "Very high",
-            "y0": 80,
-            "y1": 1000000000,
-            "color": "rgba(30,144,255,0.3)",
+            "lower": 80,
+            "upper": 100,
+            "color": "rgb(56,70,114)",
         },
     ],
-    "PRECTOTCORR": [  # lượng mưa (mm/h)
+    "PRECTOTCORR": [
         {
-            "label": "Light intensity",
-            "y0": 0,
-            "y1": 2.5,
-            "color": "rgba(211,211,211,0.3)",
+            "label": "Light rain",
+            "lower": 0,
+            "upper": 2.5,
+            "color": "rgb(60,116,160)",
         },
-        {"label": "Moderate", "y0": 2.5, "y1": 10, "color": "rgba(30,144,255,0.3)"},
-        {"label": "Heavy", "y0": 10, "y1": 1000000000, "color": "rgba(75,0,130,0.3)"},
+        {
+            "label": "Moderate rain",
+            "lower": 2.5,
+            "upper": 10,
+            "color": "rgb(59,161,61)",
+        },
+        {
+            "label": "Heavy rain",
+            "lower": 10,
+            "upper": float("inf"),
+            "color": "rgb(161,161,59)",
+        },
     ],
-    "ALLSKY_SFC_SW_DWN": [  # bức xạ mặt trời (W/m²)
-        {"label": "Weak", "y0": 0, "y1": 200, "color": "rgba(211,211,211,0.3)"},
-        {"label": "Average", "y0": 200, "y1": 600, "color": "rgba(255,255,0,0.3)"},
-        {"label": "Strong", "y0": 600, "y1": 1000, "color": "rgba(255,165,0,0.3)"},
+    "ALLSKY_SFC_SW_DWN": [
+        {
+            "label": "Very weak",
+            "lower": 0,
+            "upper": 5,
+            "color": "rgb(110,110,110)"
+        },
+        {
+            "label": "Weak",
+            "lower": 5,
+            "upper": 200,
+            "color": "rgb(208,90,81)"
+        },
+        {
+            "label": "Average",
+            "lower": 200,
+            "upper": 600,
+            "color": "rgb(242,170,110)",
+        },
+        {
+            "label": "Strong",
+            "lower": 600,
+            "upper": 1000,
+            "color": "rgb(255,208,141)",
+        },
         {
             "label": "Very strong",
-            "y0": 1000,
-            "y1": 1000000000,
-            "color": "rgba(255,69,0,0.3)",
+            "lower": 1000,
+            "upper": float("inf"),
+            "color": "rgb(255,245,180)",
         },
     ],
 }

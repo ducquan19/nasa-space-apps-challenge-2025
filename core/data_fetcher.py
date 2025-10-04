@@ -6,7 +6,7 @@ import aiohttp
 import pandas as pd
 
 
-async def fetch_power(
+async def fetch_hourly_data_from_power_dav(
     session: aiohttp.ClientSession,
     latitude: float,
     longitude: float,
@@ -14,23 +14,6 @@ async def fetch_power(
     end_date: str,
     parameters: List[str],
 ) -> Dict[str, Any]:
-    """
-    Fetch hourly power data from NASA POWER API.
-
-    Args:
-        session (aiohttp.ClientSession): Active aiohttp session for making requests.
-        latitude (float): Latitude of the location.
-        longitude (float): Longitude of the location.
-        start_date (str): Start date in YYYYMMDD format.
-        end_date (str): End date in YYYYMMDD format.
-        parameters (List[str]): List of parameters to fetch.
-
-    Returns:
-        Dict[str, Any]: Dictionary containing the requested parameters.
-
-    Raises:
-        RuntimeError: If response JSON does not contain the expected structure.
-    """
     url = (
         "https://power.larc.nasa.gov/api/temporal/hourly/point"
         f"?start={start_date}&end={end_date}"
@@ -49,8 +32,8 @@ async def fetch_power(
         return data["properties"]["parameter"]
 
 
-async def get_raw_data_async(
-    target_dt: datetime,
+async def get_hourly_data_async(
+    target_date: datetime,
     latitude: float,
     longitude: float,
     parameters: List[str],
@@ -60,50 +43,47 @@ async def get_raw_data_async(
     dfs: List[pd.DataFrame] = []
 
     async with aiohttp.ClientSession() as session:
-        tasks = []
-        for y in range(1, years_back + 1):
-            past_year = target_dt.year - y
-            start = (
-                target_dt.replace(year=past_year) - timedelta(days=window)
+        sessions = []
+        for i in range(1, years_back + 1):
+            past_year = target_date.year - i
+            start_date = (
+                target_date.replace(year=past_year) - timedelta(days=window)
             ).strftime("%Y%m%d")
-            end = (target_dt.replace(year=past_year) + timedelta(days=window)).strftime(
-                "%Y%m%d"
-            )
-            tasks.append(
-                fetch_power(session, latitude, longitude, start, end, parameters)
+            end_date = (
+                target_date.replace(year=past_year) + timedelta(days=window)
+            ).strftime("%Y%m%d")
+            sessions.append(
+                fetch_hourly_data_from_power_dav(
+                    session, latitude, longitude, start_date, end_date, parameters
+                )
             )
 
-        results = await asyncio.gather(*tasks)
+        results = await asyncio.gather(*sessions)
 
     for i, result in enumerate(results, 1):
-        past_year = target_dt.year - i
-        df = pd.DataFrame({p: pd.Series(result[p]) for p in parameters})
+        past_year = target_date.year - i
+        df = pd.DataFrame(
+            {parameter: pd.Series(result[parameter]) for parameter in parameters}
+        )
         df.index = pd.to_datetime(df.index, format="%Y%m%d%H")
-        df["year"] = past_year
-        df["hour"] = df.index.hour
         dfs.append(df)
 
-    if not dfs:
-        return pd.DataFrame(columns=parameters + ["year", "hour"])
-
     full_df = pd.concat(dfs, axis=0)
-    return full_df.reset_index(drop=True)
+    return full_df
 
 
-def fetch_raw_data(
-    target_dt: datetime,
+def fetch_hourly_data(
+    target_date: datetime,
     latitude: float,
     longitude: float,
     parameters: List[str],
     window: int = 5,
     years_back: int = 10,
 ) -> pd.DataFrame:
-    """
-    Sync wrapper for get_raw_data_async. Returns pandas.DataFrame.
-    """
+
     return asyncio.run(
-        get_raw_data_async(
-            target_dt,
+        get_hourly_data_async(
+            target_date,
             latitude,
             longitude,
             parameters,
@@ -111,3 +91,65 @@ def fetch_raw_data(
             years_back=years_back,
         )
     )
+
+
+async def fetch_monthly_data_from_power_dav(
+    session: aiohttp.ClientSession,
+    latitude: float,
+    longitude: float,
+    start_year: str,
+    end_year: str,
+    parameters: List[str],
+) -> Dict[str, Any]:
+    url = (
+        "https://power.larc.nasa.gov/api/temporal/monthly/point"
+        f"?start={start_year}&end={end_year}"
+        f"&latitude={latitude}&longitude={longitude}"
+        f"&parameters={','.join(parameters)}"
+        f"&format=JSON&community=RE"
+    )
+    async with session.get(url) as response:
+        response.raise_for_status()
+        js = await response.json()
+        return js["properties"]["parameter"]
+
+
+async def get_monthly_data_async(
+    target_date: datetime,
+    latitude: float,
+    longitude: float,
+    parameters: List[str],
+    window: int = 0,
+    years_back: int = 10,
+):
+    dfs = []
+    async with aiohttp.ClientSession() as session:
+        sessions = []
+        for i in range(1, years_back + 1):
+            past_year = target_date.year - i
+            start_year = (
+                target_date.replace(year=past_year) - timedelta(days=window)
+            ).strftime("%Y")
+            end_year = (
+                target_date.replace(year=past_year) + timedelta(days=window)
+            ).strftime("%Y")
+            sessions.append(
+                fetch_monthly_data_from_power_dav(
+                    session, latitude, longitude, start_year, end_year, parameters
+                )
+            )
+        results = await asyncio.gather(*sessions)
+
+    # convert to dataframe list
+    for i, result in enumerate(results, 1):
+        past_year = target_date.year - i
+        for p in parameters:
+            del result[p][f"{past_year}13"]
+        df = pd.DataFrame({parameter: pd.Series(result[p]) for parameter in parameters})
+        df.index = pd.to_datetime(df.index, format="%Y%m")
+        df["year"] = past_year
+        df["month"] = df.index.month
+        dfs.append(df)
+
+    full_df = pd.concat(dfs, axis=0)
+    return full_df.reset_index(drop=True)
