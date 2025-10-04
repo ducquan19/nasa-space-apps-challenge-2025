@@ -84,7 +84,9 @@ async def forecast_monthly(place: str = Query(...)):
     latitude, longitude = geocode_osm(place)
 
     target_date = datetime.now()
-    raw_df = await get_monthly_data_async(target_date, latitude, longitude, ["PRECTOTCORR", "T2M"])
+    raw_df = await get_monthly_data_async(
+        target_date, latitude, longitude, ["PRECTOTCORR", "T2M"]
+    )
     avg_df = create_monthly_avg_df(raw_df, ["PRECTOTCORR", "T2M"])
     if raw_df.empty:
         raise RuntimeError("Không có dữ liệu từ NASA POWER")
@@ -111,7 +113,6 @@ def forecast_point_many_days(
     latitude, longitude = geocode_osm(place)
     start_date = datetime.fromisoformat(start_date)
     end_date = datetime.fromisoformat(end_date)
-    print(start_date, end_date)
     ci_list = []
     target_date = start_date
     while target_date <= end_date:
@@ -129,14 +130,14 @@ def forecast_point_many_days(
         ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS)
         ci_list.append(ci_df)
 
-    print(start_date, end_date)
     ci = pd.concat(ci_list, axis=0).reset_index()
     ci = ci.drop_duplicates(subset=["datetime"], keep="last")
+    ci = ci.drop(ci.columns[0], axis=1)
 
     # 6. Vẽ biểu đồ cho tất cả param
     figures = {}
     for parameter in PARAMETERS:
-        fig_dict = plotly_many_days(ci_df, parameter)
+        fig_dict = plotly_many_days(ci, parameter)
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {

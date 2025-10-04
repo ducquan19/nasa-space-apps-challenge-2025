@@ -31,7 +31,6 @@ async function getForecastByModel() {
   // So sánh theo ngày/tháng/năm
   if (new Date(date1).toDateString() === new Date(date2).toDateString()) {
     ///////  Dự báo 1 ngày
-
     const date = date1;
     try {
       // Kiểm tra box-hourly
@@ -86,7 +85,59 @@ async function getForecastByModel() {
       alert("Lỗi khi gọi API!");
     }
   } else {
-    ///////  Dự báo 1 ngày
+    ///////  Dự báo nhiều ngày
+    try {
+      // Kiểm tra box-ten-days
+      let boxTenDays = document.getElementById("box-ten-days");
+      if (!boxTenDays) {
+        const btnHourly = document.querySelector(".btn.btn--primary");
+        if (btnHourly) btnHourly.click();
+        // chờ cho DOM render
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        boxTenDays = document.getElementById("box-ten-days");
+      }
+
+      // Tạo hoặc reset chartsHourly
+      let chartsDiv = document.getElementById("chartsTenDays");
+      if (!chartsDiv) {
+        chartsDiv = document.createElement("div");
+        chartsDiv.id = "chartsTenDays";
+        boxTenDays.appendChild(chartsDiv);
+      }
+      chartsDiv.innerHTML = `<p style="text-align:center">Loading...</p>`;
+      chartsDiv.scrollIntoView({ behavior: "smooth" });
+
+      // Gọi API
+      const res = await fetch(
+        `http://127.0.0.1:8000/forecast_point_many_days?place=${encodeURIComponent(
+          place
+        )}&start_date=${date1}&end_date=${date2}`
+      );
+
+      const data = await res.json();
+
+      // Xóa loading khi có dữ liệu
+      chartsDiv.innerHTML = "";
+
+      if (data.error) {
+        alert(data.error);
+        return;
+      }
+
+      //  Vẽ biểu đồ
+      Object.keys(data.figures).forEach((param) => {
+        const figData = JSON.parse(data.figures[param]);
+        const container = document.createElement("div");
+        container.className = "chart";
+        container.id = "chart_" + param;
+        chartsDiv.appendChild(container);
+
+        Plotly.newPlot(container, figData.data, figData.layout);
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Lỗi khi gọi API!");
+    }
   }
 }
 window.getForecastByModel = getForecastByModel; // gán vào global để sử dụng trên button Get  Weather

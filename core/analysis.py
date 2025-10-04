@@ -297,7 +297,7 @@ def plotly_fanmap_many_days(
 
     # Layout
     fig.update_layout(
-        title=f"{PARAMETER[parameter]['name']} from {x[0].split()[0]} to {x[-1].split()[0]}",
+        title=f"{PARAMETER[parameter]['name']} from {x[0].split()[0]} to {x[-2].split()[0]}",
         xaxis_title="Time",
         yaxis_title=f"{PARAMETER[parameter]['name']} ({PARAMETER[parameter]['unit']})",
         template="simple_white",
