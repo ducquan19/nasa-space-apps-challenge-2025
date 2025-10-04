@@ -95,7 +95,7 @@ async def forecast_monthly(place: str = Query(...)):
 
     figures = {}
     for parameter in ["PRECTOTCORR", "T2M"]:
-        fig_dict = plotly_monthly_overview(avg_df, parameter).to_dict
+        fig_dict = plotly_monthly_overview(avg_df, parameter).to_dict()
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
