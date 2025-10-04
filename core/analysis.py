@@ -177,10 +177,142 @@ def plotly_fanmap_one_day(
     return fig
 
 
-def plot_fanmap_plotly(
+def plotly_one_day(
     pred_df: pd.DataFrame, parameter: str, ci_levels: List[float] = [30, 60, 90]
 ):
     fig = plotly_fanmap_one_day(pred_df, parameter, ci_levels)
+    return fig.to_dict()
+
+
+def plotly_fanmap_many_days(
+    pred_df: pd.DataFrame, parameter: str, ci_levels: List[float] = [30, 60, 90]
+):
+    sns.set_style("whitegrid")
+    colors = sns.color_palette("Set2", len(ci_levels))
+    x = pred_df["datetime"].astype(str).tolist()
+    x_dt = pred_df["datetime"]  # giữ dạng datetime
+    traces = []
+
+    # CI segments
+    for idx, ci in enumerate(sorted(ci_levels, reverse=True)):
+        low = pred_df[f"{parameter}_low_{ci}"].tolist()
+        high = pred_df[f"{parameter}_high_{ci}"].tolist()
+        traces.append(
+            go.Scatter(
+                x=x + x[::-1],
+                y=low + high[::-1],
+                fill="toself",
+                fillcolor=f"rgba({int(colors[idx][0] * 255)}, {int(colors[idx][1] * 255)}, {int(colors[idx][2] * 255)}, 0.3)",
+                line=dict(color="rgba(255,255,255,0)"),
+                hoverinfo="skip",
+                name=f"{ci}%",
+            )
+        )
+
+    # Mean line
+    mean_vals = pred_df[parameter].tolist()
+    traces.append(
+        go.Scatter(
+            x=x,
+            y=mean_vals,
+            mode="lines+markers",
+            line=dict(color="black", width=2),
+            name="Mean",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
+        )
+    )
+
+    fig = go.Figure(data=traces)
+    thresholds = PARAMETER[parameter]["thresholds"]
+
+    # Gom các đoạn liên tiếp cùng loại gió
+    segments = []
+    current_class = None
+    x0 = None
+
+    for i, val in enumerate(mean_vals):
+        cls = classify_threshold(val, thresholds)
+        if cls != current_class:
+            if current_class is not None:
+                segments.append((x0, x_dt[i], current_class))
+            current_class = cls
+            x0 = x_dt[i]
+    if current_class is not None:
+        segments.append((x0, x_dt.iloc[-1], current_class))
+
+    # Vẽ các vrect gom nhóm theo Beaufort
+    for x0, x1, threshold in segments:
+        if x0 == x1:
+            x1 += 0.05
+        fig.add_vrect(
+            x0=x0,
+            x1=x1,
+            fillcolor=threshold["color"],
+            opacity=0.3,  # tăng độ đậm
+            layer="below",
+            line_width=0,
+            annotation_text=threshold["label"],
+            annotation_position="top left",
+            annotation=dict(font_size=12, font_color="black", font_weight="bold"),
+        )
+
+    # Thêm legend (trace ẩn cho mỗi loại gió)
+    for threshold in thresholds:
+        fig.add_trace(
+            go.Scatter(
+                x=[None],
+                y=[None],
+                mode="markers",
+                marker=dict(size=10, color=threshold["color"]),
+                name=threshold["label"],
+            )
+        )
+
+    # --- Local maxima / minima ---
+    y = np.array(mean_vals)
+    maxima = np.r_[False, (y[1:-1] > y[:-2]) & (y[1:-1] > y[2:]), False]
+    minima = np.r_[False, (y[1:-1] < y[:-2]) & (y[1:-1] < y[2:]), False]
+
+    fig.add_trace(
+        go.Scatter(
+            x=np.array(x)[maxima],
+            y=y[maxima],
+            mode="markers",
+            marker=dict(color="red", size=10, symbol="circle"),
+            name="Max",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=np.array(x)[minima],
+            y=y[minima],
+            mode="markers",
+            marker=dict(color="blue", size=10, symbol="circle"),
+            name="Min",
+            hovertemplate=f"%{{x}}<br>{PARAMETER[parameter]['name']}: %{{y:.2f}} {PARAMETER[parameter]['unit']} <extra></extra>",
+        )
+    )
+
+    # Layout
+    fig.update_layout(
+        title=f"{PARAMETER[parameter]['name']} from {x[0].split()[0]} to {x[-1].split()[0]}",
+        xaxis_title="Time",
+        yaxis_title=f"{PARAMETER[parameter]['name']} ({PARAMETER[parameter]['unit']})",
+        template="simple_white",
+    )
+
+    # Hiển thị lưới
+    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor="lightgray")
+
+    return fig
+
+
+def plotly_many_days(
+    pred_df: pd.DataFrame, parameter: str, ci_levels: List[float] = [30, 60, 90]
+):
+    fig = plotly_fanmap_many_days(pred_df, parameter, ci_levels)
     return fig.to_dict()
 
 
@@ -283,7 +415,7 @@ def plotly_monthly_overview(pred_df: pd.DataFrame, parameter: str):
 
     # Layout
     fig.update_layout(
-        title=f"{PARAMETER[parameter]['name']} on {datetime.now().year}",
+        title=f"{PARAMETER[parameter]['name']} per day on {datetime.now().year}",
         xaxis_title="Time",
         yaxis_title=f"{PARAMETER[parameter]['name']} ({PARAMETER[parameter]['unit']})",
         template="simple_white",

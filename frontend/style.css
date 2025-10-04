@@ -182,19 +182,17 @@ body {
 #recommend {
   flex: 1;
   margin-left: 30px;
-  padding: 5px;
+  padding: 10px;
+  padding-left: 20px;
   border: 1px solid #ccc;
   border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(255, 255, 255, 0.55);
   text-align: left;
-}
-
-#recommend p {
-  padding: 5px;
-  margin: 0;
-  font-size: 1rem;
+  overflow-y: auto;
+  max-height: 13vh;
   color: #333;
 }
+
 header {
   height: var(--header-height);
   min-height: 84px;
@@ -488,7 +486,7 @@ a.climate-link {
 }
 
 .grid_item {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.6);
   font-size: 16px;
   font-style: bold;
 }
@@ -504,5 +502,17 @@ a.climate-link {
 
 #chartsHourly .chart {
   width: 100% !important; /* ép mỗi chart full chiều ngang của ô */
-  height: 400px; /* tuỳ chỉnh chiều cao */
+  height: 400px;
+}
+
+#chartsTenDays {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 cột */
+  gap: 20px; /* khoảng cách giữa các chart */
+  padding: 10px;
+}
+
+#chartsTenDays .chart {
+  width: 100% !important; /* ép mỗi chart full chiều ngang của ô */
+  height: 400px;
 }

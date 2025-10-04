@@ -14,7 +14,8 @@ from core.geocode import geocode_osm, get_current_place
 from core.data_fetcher import fetch_hourly_data, get_monthly_data_async
 from core.analysis import (
     compute_ci_multitarget,
-    plot_fanmap_plotly,
+    plotly_one_day,
+    plotly_many_days,
     compute_ci_from_pred_df,
     normalize_raw_df,
     forecast_lightgbm_multitarget,
@@ -58,7 +59,7 @@ def forecast_point_one_day(place: str = Query(...), date: str = Query(...)):
         PARAMETERS,
         target_date,
         quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-        num_boost_round=300,
+        num_boost_round=10,
     )
 
     # 3) compute CI dataframe
@@ -67,7 +68,7 @@ def forecast_point_one_day(place: str = Query(...), date: str = Query(...)):
     # 6. Vẽ biểu đồ cho tất cả param
     figures = {}
     for parameter in PARAMETERS:
-        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        fig_dict = plotly_one_day(ci_df, parameter)
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
@@ -83,15 +84,15 @@ async def forecast_monthly(place: str = Query(...)):
     latitude, longitude = geocode_osm(place)
 
     target_date = datetime.now()
-    raw_df = await get_monthly_data_async(target_date, latitude, longitude, PARAMETERS)
-    avg_df = create_monthly_avg_df(raw_df, PARAMETERS)
+    raw_df = await get_monthly_data_async(target_date, latitude, longitude, ["PRECTOTCORR", "T2M"])
+    avg_df = create_monthly_avg_df(raw_df, ["PRECTOTCORR", "T2M"])
     if raw_df.empty:
         raise RuntimeError("Không có dữ liệu từ NASA POWER")
 
     # 3) compute CI dataframe
 
     figures = {}
-    for parameter in PARAMETERS:
+    for parameter in ["PRECTOTCORR", "T2M"]:
         fig_dict = plotly_monthly_overview(avg_df, parameter).to_dict
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
@@ -112,19 +113,18 @@ def forecast_point_many_days(
     end_date = datetime.fromisoformat(end_date)
     print(start_date, end_date)
     ci_list = []
-
-    while start_date <= end_date:
-        target_date = start_date
+    target_date = start_date
+    while target_date <= end_date:
         raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
         raw_df = normalize_raw_df(raw_df)
-        start_date += timedelta(1)
+        target_date += timedelta(1)
         # 2) dự đoán bằng LightGBM quantile
         pred_df, models = forecast_lightgbm_multitarget(
             raw_df,
             PARAMETERS,
             target_date,
             quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-            num_boost_round=300,
+            num_boost_round=10,
         )
         ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS)
         ci_list.append(ci_df)
@@ -136,7 +136,7 @@ def forecast_point_many_days(
     # 6. Vẽ biểu đồ cho tất cả param
     figures = {}
     for parameter in PARAMETERS:
-        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        fig_dict = plotly_many_days(ci_df, parameter)
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
@@ -155,9 +155,7 @@ def average_point(coords: list[list[float]]) -> tuple[float, float]:
 
 
 @app.post("/forecast_region")
-async def forecast_region_one_day(
-    coords: List[List[float]], target_date: str = Query(...)
-):
+def forecast_region_one_day(coords: List[List[float]], target_date: str = Query(...)):
     latitude, longitude = average_point(coords)
 
     try:
@@ -176,7 +174,7 @@ async def forecast_region_one_day(
         PARAMETERS,
         target_date,
         quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-        num_boost_round=300,
+        num_boost_round=10,
     )
 
     # 3) compute CI dataframe
@@ -185,7 +183,7 @@ async def forecast_region_one_day(
     # 6. Vẽ biểu đồ cho tất cả param
     figures = {}
     for parameter in PARAMETERS:
-        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        fig_dict = plotly_one_day(ci_df, parameter)
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
@@ -212,21 +210,20 @@ def forecast_region_many_days(
     latitude, longitude = average_point(coords)
     start_date = datetime.fromisoformat(start_date)
     end_date = datetime.fromisoformat(end_date)
-
+    target_date = start_date
     ci_list = []
 
-    while start_date <= end_date:
-        target_date = start_date
+    while target_date <= end_date:
         raw_df = fetch_hourly_data(target_date, latitude, longitude, PARAMETERS)
         raw_df = normalize_raw_df(raw_df)
-        start_date += timedelta(1)
+        target_date += timedelta(1)
         # 2) dự đoán bằng LightGBM quantile
         pred_df, models = forecast_lightgbm_multitarget(
             raw_df,
             PARAMETERS,
             target_date,
             quantiles=[0.05, 0.2, 0.35, 0.5, 0.65, 0.8, 0.95],
-            num_boost_round=300,
+            num_boost_round=10,
         )
         ci_df = compute_ci_from_pred_df(pred_df, PARAMETERS)
         ci_list.append(ci_df)
@@ -237,7 +234,7 @@ def forecast_region_many_days(
     # 6. Vẽ biểu đồ cho tất cả param
     figures = {}
     for parameter in PARAMETERS:
-        fig_dict = plot_fanmap_plotly(ci_df, parameter)
+        fig_dict = plotly_many_days(ci_df, parameter)
         figures[parameter] = json.dumps(fig_dict, default=str)  # ép thành JSON string
 
     return {
