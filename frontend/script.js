@@ -1,32 +1,36 @@
 ////// Tìm kiếm tọa độ dùng API
 
-import {apiKey} from "./config.js";
+import { apiKey } from "./config.js";
 
 export async function getCoordinates(city) {
-    // Return 1 result
-    const url = `http://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("City not found");
-    const data = await response.json();
-    if (data.length === 0) throw new Error("City not found");
-    return { lat: data[0].lat, lon: data[0].lon, local_name: data[0].local_names, country: data[0].country};
+  // Return 1 result
+  const url = `http://api.openweathermap.org/geo/1.0/direct?q=${city}&limit=1&appid=${apiKey}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error("City not found");
+  const data = await response.json();
+  if (data.length === 0) throw new Error("City not found");
+  return {
+    lat: data[0].lat,
+    lon: data[0].lon,
+    local_name: data[0].local_names,
+    country: data[0].country,
+  };
 }
 
 export async function getNameByCoordinates(lat, lon) {
-    const url = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`;
-    const response = await fetch(url);
-    const data = await response.json();
-    let placeName = "Unknown place";
-    if (data && data.length > 0) {
-      placeName = data[0].name;
-    }
-    return { place_name: placeName, country: data[0].country}
+  const url = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${apiKey}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  let placeName = "Unknown place";
+  if (data && data.length > 0) {
+    placeName = data[0].name;
+  }
+  return { place_name: placeName, country: data[0].country };
 }
-
 
 ////// Hàm lấy thông tin độ cao và khí hậu
 
-// Lấy độ cao từ Open-Elevation API 
+// Lấy độ cao từ Open-Elevation API
 export async function getElevation(lat, lon) {
   let elevation = null;
   try {
@@ -43,9 +47,9 @@ export async function getElevation(lat, lon) {
   return elevation;
 }
 
-// Lấy vùng khí hậu từ GeoTIFF 
+// Lấy vùng khí hậu từ GeoTIFF
 
-import {koppenClasses} from "./map.js";
+import { koppenClasses } from "./map.js";
 
 export function getClimate(lat, lon, georaster) {
   let climateCode = null;
@@ -65,8 +69,10 @@ export function getClimate(lat, lon, georaster) {
 
       // Đọc giá trị từ band 0
       if (
-        yPixel >= 0 && yPixel < georaster.height &&
-        xPixel >= 0 && xPixel < georaster.width
+        yPixel >= 0 &&
+        yPixel < georaster.height &&
+        xPixel >= 0 &&
+        xPixel < georaster.width
       ) {
         const value = georaster.values[0][yPixel][xPixel];
         if (koppenClasses[value]) {
@@ -81,29 +87,29 @@ export function getClimate(lat, lon, georaster) {
 
   return { climateCode, climateType };
 }
-  
+
 ////// Hàm Lấy thời tiết hiện tại
 
 async function getCurrentWeather(lat, lon) {
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
-    const response = await fetch(url);
-    if(!response.ok){
-        throw new Error("Could not fetch weather data");
-    }
-    return await response.json();
+  const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error("Could not fetch weather data");
+  }
+  return await response.json();
 }
 
 ////// Cấu hình các option button: mở và đóng
 
 const titles = {
-    "ten-days": "Weather for 10 days",
-    "hourly": "Hourly Weather",
-    "planning": "For planning",
-    "self": "Self forecasting"
+  "ten-days": "Weather for 10 days",
+  hourly: "Hourly Weather",
+  planning: "For planning",
+  self: "Self forecasting",
 };
 
-document.querySelectorAll("button[data-target]").forEach(btn => {
-    btn.addEventListener("click", () => {
+document.querySelectorAll("button[data-target]").forEach((btn) => {
+  btn.addEventListener("click", () => {
     const key = btn.getAttribute("data-target");
     const existingBox = document.getElementById("box-" + key);
     const main = document.querySelector("main");
@@ -251,22 +257,22 @@ function showClimatePopup(climateCode, climateType) {
   title.textContent = `${climateCode} - ${climateType}`;
   // Đọc file txt có tên trùng với climateCode
   fetch(`./data/climate/desc-en/${climateCode}.txt`)
-    .then(response => {
+    .then((response) => {
       if (!response.ok) {
         throw new Error("Không tìm thấy file " + climateCode + ".txt");
       }
       return response.text();
     })
-    .then(text => {
+    .then((text) => {
       // Giữ xuống dòng trong file txt khi hiển thị
       desc.innerHTML = text.replace(/\n/g, "<br>");
     })
-    .catch(err => {
+    .catch((err) => {
       desc.textContent = "Không có dữ liệu mô tả cho khí hậu này.";
       console.error(err);
     });
 
-      // Load ảnh
+  // Load ảnh
   for (let i = 1; i <= 4; i++) {
     const imgEl = document.getElementById(`img${i}`);
     imgEl.src = `./data/climate/img/${climateCode}-${i}.jpg`;
@@ -276,12 +282,12 @@ function showClimatePopup(climateCode, climateType) {
 }
 
 // Đóng modal khi bấm dấu X
-document.querySelector(".modal .close").onclick = function() {
+document.querySelector(".modal .close").onclick = function () {
   document.getElementById("climate_modal").style.display = "none";
 };
 
 // Đóng modal khi click ra ngoài
-window.onclick = function(event) {
+window.onclick = function (event) {
   const modal = document.getElementById("climate_modal");
   if (event.target === modal) {
     modal.style.display = "none";
