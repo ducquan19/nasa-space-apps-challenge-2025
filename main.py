@@ -205,8 +205,8 @@ def current_place(request: Request):
     )
 
 
-@app.get("/forecast_point_many_days")
-def forecast_point_many_days(
+@app.get("/forecast_region_many_days")
+def forecast_region_many_days(
     coords: List[List[float]], start_date: str = Query(...), end_date: str = Query(...)
 ):
     latitude, longitude = average_point(coords)
